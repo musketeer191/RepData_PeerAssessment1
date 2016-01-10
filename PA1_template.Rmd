@@ -130,4 +130,5 @@ p2 <- p2 + xlab("Interval") + ylab("Avg. number of steps taken")
 p2
 ```
 
+From the two plots, we can see that the test subject is more active earlier in the day during weekdays compared to weekends. Possible explanation is that he needs to wake up to prepare for working. Also, the peak of activity on weekends is later than weekdays, which shows that the subject sleeps in on weekends.
 

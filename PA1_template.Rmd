@@ -1,25 +1,133 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Activity Monitoring"
+author: "Duc"
+date: "Sunday, January 10, 2016"
+output: html_document
 ---
 
-
-## Loading and preprocessing the data
-
-
-
-## What is mean total number of steps taken per day?
-
+Set the default of echo to be true throughout the document:
+```{r}
+library(knitr)
+opts_chunk$set(echo = TRUE)
+```
 
 
-## What is the average daily activity pattern?
+### Load and check structure of data
+```{r}
+ds <- read.csv("activity.csv")
+str(ds)
+```
+
+### What is mean total number of steps taken per day?
+1. Calculate the total number of steps taken per day: we can do this by `tapply` function
+```{r}
+res1 <- tapply(ds$steps, ds$date, sum)
+```
+
+2. Histogram of the total number of steps taken each day
+```{r}
+hist(res1, xlab = "Total number of steps", ylab = "Number of days", 
+     main = "Histogram of the total number of steps taken each day")
+```
+
+3. Mean and median of the total number of steps taken per day (ignoring NAs):
+```{r}
+mean(res1, na.rm = T)
+median(res1, na.rm = T)
+```
+
+### What is the average daily activity pattern?
+1. Time series plot of the average number of steps taken in each 5-minute interval, where we average over all days.
+  1. compute the average for each 5-minute interval
+```{r}
+require(plyr)
+intervals <- unique(ds$interval)
+daily.ds <- ldply(intervals, function(ii) {
+  avg.steps <- with(ds, mean(steps[interval == ii], na.rm = T))
+  data.frame("interval" = ii, "avg.steps" = avg.steps)
+})
+```
+
+  2. plot the time series
+```{r}
+require(ggplot2)
+pp <- ggplot(data = daily.ds, aes(x = interval, y = avg.steps)) + geom_line(colour = "red")
+pp <- pp + xlab("Interval") + ylab("Average number of steps taken")
+pp
+```
+
+  3. Careful observation of the intervals (their ids actually) show that the ids >= 100 are actually not integers!! They actually have the form hhmm, for example 105 is 1 hour, 5 mins. Thus we need to parse the intervals using `lubridate` library.
+```{r}
+require(lubridate)
+daily.ds <- transform(daily.ds, parse.interval = hm(interval/100))
+```
+
+  4. We found that the interval containing the maximum number of steps is 8:35AM. This is reasonable since that is the time we go to work.
+```{r}
+with(daily.ds, parse.interval[which.max(avg.steps)])
+```
+
+### Imputing missing values
+1. The total number of missing values in the dataset is:
+```{r}
+sum(is.na(ds$steps))
+```
+
+2. We will impute missing values by the mean of the corresponding interval
+```{r}
+nas <- which(is.na(ds$steps))
+full.steps <- numeric(nrow(ds))
+full.steps[-nas] <- ds$steps[-nas]
+full.steps[nas] <- sapply(nas, function(rr) {
+  with(daily.ds, avg.steps[interval == ds$interval[rr]])
+})
+full.ds <- data.frame("steps" = full.steps, "date" = ymd(ds$date), "interval" = ds$interval)
+```
+
+3. After imputing missing values, the new histogram of the total number of steps taken each day:
+```{r}
+steps.per.day <- tapply(full.ds$steps, full.ds$date, sum)
+par(mfrow = c(1, 2))
+hist(steps.per.day, xlab = "Total number of steps", ylab = "Number of days", 
+     main = "Histogram after imputing NAs", col = "blue")
+hist(res1, xlab = "Total number of steps", ylab = "Number of days", 
+     main = "Original histogram")
+```
+
+  1. Mean total number of steps:
+```{r}
+# before imputing missing values 
+mean(res1, na.rm = T)
+# after imputing missing values 
+mean(steps.per.day)
+```
+The `mean` stays the same.
+
+  2. Median total number of steps:
+```{r}
+# before imputing missing values 
+median(res1, na.rm = T)
+# after imputing missing values 
+median(steps.per.day)
+```
+The `median` is slightly increase.
+
+### Are there differences in activity patterns between weekdays and weekends?
+1. Create indicators for weekdays and weekends:
+```{r}
+full.ds <- transform(full.ds, weekday = weekdays(date))
+full.ds <- transform(full.ds, type = ifelse(weekday %in% c("Saturday", "Sunday"), "weekend", "weekday"))
+```
+
+2. 
+```{r}
+require(dplyr)
+interval_full <- full.ds %>% group_by(interval, type) %>% summarise(avg.steps = mean(steps))
+p2 <- ggplot(data = interval_full, aes(x = interval, y = avg.steps, colour = type)) + geom_line() + 
+    facet_wrap(~ type, ncol = 1, nrow=2) + theme(legend.position="none")
+
+p2 <- p2 + xlab("Interval") + ylab("Avg. number of steps taken")
+p2
+```
 
 
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
